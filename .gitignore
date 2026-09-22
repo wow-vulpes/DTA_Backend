@@ -1,0 +1,20 @@
+/target/
+/.idea/
+*.iml
+/.vscode/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Local development workflow and progress
+/.agents/
+/.codex/
+/AGENTS.md
+/docs/requirements.md
+/docs/plan.md
+/docs/progress.md
+
+# Temporary: remove before final project delivery
+/README.md
