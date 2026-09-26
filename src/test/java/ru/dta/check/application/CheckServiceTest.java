@@ -4,8 +4,12 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import ru.dta.check.domain.MaterialMetadata;
 import ru.dta.check.domain.MaterialTypeDetector;
 import ru.dta.check.domain.RecordChecker;
@@ -17,6 +21,7 @@ import ru.dta.check.persistence.CheckRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,5 +64,28 @@ class CheckServiceTest {
         RuntimeException failure = new IllegalStateException("database failure");
         when(repository.save(any())).thenThrow(failure);
         assertThatThrownBy(() -> service.createCheck(RecordType.DAILY, List.of())).isSameAs(failure);
+    }
+
+    @Test
+    void findsPageWithFiltersAndStablePageMetadata() {
+        CheckEntity entity = CheckEntity.fromResult(RecordType.DAILY,
+                new RecordChecker(new MaterialTypeDetector()).check(RecordType.DAILY, List.of()), now,
+                "Комплект неполный", "Нет материалов.");
+        when(repository.findAll(nullable(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(entity), Pageable.ofSize(20).withPage(1), 21));
+        CheckListPage page = service.findChecks(new ru.dta.check.api.CheckQuery(
+                "daily", "incomplete", null, null, 1, 20));
+        assertThat(page.items()).containsExactly(entity);
+        assertThat(page.page()).isEqualTo(1);
+        assertThat(page.size()).isEqualTo(20);
+        assertThat(page.total()).isEqualTo(21);
+    }
+
+    @Test
+    void missingDetailIsReported() {
+        UUID id = UUID.randomUUID();
+        when(repository.findById(id)).thenReturn(java.util.Optional.empty());
+        assertThatThrownBy(() -> service.getCheck(id))
+                .isInstanceOf(ru.dta.check.api.CheckNotFoundException.class);
     }
 }

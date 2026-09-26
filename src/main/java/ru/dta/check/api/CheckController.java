@@ -2,14 +2,19 @@ package ru.dta.check.api;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Instant;
+import java.util.UUID;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import ru.dta.check.application.CheckService;
@@ -62,6 +67,28 @@ public class CheckController {
             throw new InvalidCheckRequestException(errors);
         }
         return responseMapper.toResponse(checkService.createCheck(type, materials));
+    }
+
+    @GetMapping(value = "/api/checks", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Transactional(readOnly = true)
+    public CheckListResponse findChecks(@RequestParam(name = "record_type", required = false) String recordType,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "from", required = false) Instant from,
+            @RequestParam(name = "to", required = false) Instant to,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
+        if (page < 0 || size < 1 || size > 100 || (from != null && to != null && !from.isBefore(to))) {
+            throw new InvalidCheckRequestException(List.of(
+                    new FieldErrorResponse("query", "Проверьте page, size, from и to.")));
+        }
+        return responseMapper.toListResponse(checkService.findChecks(
+                new CheckQuery(recordType, status, from, to, page, size)));
+    }
+
+    @GetMapping(value = "/api/checks/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Transactional(readOnly = true)
+    public CheckResponse getCheck(@PathVariable("id") UUID id) {
+        return responseMapper.toResponse(checkService.getCheck(id));
     }
 
     private boolean validFilename(String name) {

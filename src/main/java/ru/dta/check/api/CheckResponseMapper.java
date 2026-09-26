@@ -10,6 +10,7 @@ import org.mapstruct.ReportingPolicy;
 import ru.dta.check.persistence.CheckEntity;
 import ru.dta.check.persistence.CheckDocumentEntity;
 import ru.dta.check.persistence.CheckIssueEntity;
+import ru.dta.check.application.CheckListPage;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public abstract class CheckResponseMapper {
@@ -22,6 +23,16 @@ public abstract class CheckResponseMapper {
     public abstract DocumentResponse toDocument(CheckDocumentEntity document);
 
     public abstract IssueResponse toIssue(CheckIssueEntity issue);
+
+    public CheckListResponse toListResponse(CheckListPage page) {
+        return new CheckListResponse(page.items().stream().map(this::toSummary).toList(),
+                page.page(), page.size(), page.total());
+    }
+
+    public CheckSummaryResponse toSummary(CheckEntity check) {
+        return new CheckSummaryResponse(check.getId(), check.getCheckedAt(),
+                toLowercase(check.getRecordType()), toLowercase(check.getStatus()), check.getDocuments().size());
+    }
 
     protected String toLowercase(Enum<?> value) {
         return value == null ? null : value.name().toLowerCase(Locale.ROOT);

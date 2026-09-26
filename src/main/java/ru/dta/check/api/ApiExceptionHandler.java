@@ -27,6 +27,16 @@ public class ApiExceptionHandler {
                 exception.getMessage(), exception.getFieldErrors()));
     }
 
+    @ExceptionHandler(CheckNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> notFound(CheckNotFoundException exception) {
+        return error(HttpStatus.NOT_FOUND, "check_not_found", exception.getMessage());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> invalidQuery(IllegalArgumentException exception) {
+        return error(HttpStatus.UNPROCESSABLE_CONTENT, "validation_error", exception.getMessage());
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiErrorResponse> tooLarge() {
         return error(HttpStatus.CONTENT_TOO_LARGE, "payload_too_large", "Превышен технический лимит загрузки.");

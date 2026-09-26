@@ -39,6 +39,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -148,6 +149,49 @@ class CheckControllerTest {
                 .andExpect(status().isUnsupportedMediaType())
                 .andExpect(jsonPath("$.code").value("unsupported_media_type"));
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void listsChecksWithQueryParameters() throws Exception {
+        when(service.findChecks(any())).thenReturn(new ru.dta.check.application.CheckListPage(List.of(), 1, 10, 0));
+        mvc.perform(get("/api/checks").param("record_type", "daily").param("status", "complete")
+                        .param("page", "1").param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(0)))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.total").value(0));
+        verify(service).findChecks(any());
+    }
+
+    @Test
+    void rejectsInvalidPageParameters() throws Exception {
+        mvc.perform(get("/api/checks").param("page", "-1"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.code").value("validation_error"));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void returnsFullDetail() throws Exception {
+        UUID id = UUID.randomUUID();
+        CheckEntity entity = result();
+        ReflectionTestUtils.setField(entity, "id", id);
+        when(service.getCheck(id)).thenReturn(entity);
+        mvc.perform(get("/api/checks/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.check_id").value(id.toString()))
+                .andExpect(jsonPath("$.status").value("incomplete"));
+        verify(service).getCheck(id);
+    }
+
+    @Test
+    void returnsNotFoundForMissingDetail() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(service.getCheck(id)).thenThrow(new CheckNotFoundException(id));
+        mvc.perform(get("/api/checks/{id}", id))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("check_not_found"));
     }
 
     @ParameterizedTest
