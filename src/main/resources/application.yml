@@ -1,3 +1,19 @@
 spring:
   application:
     name: dta
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 120MB
+server:
+  tomcat:
+    # Дочитать отклонённую загрузку около лимита, чтобы клиент получил ответ 413.
+    max-swallow-size: 128MB
