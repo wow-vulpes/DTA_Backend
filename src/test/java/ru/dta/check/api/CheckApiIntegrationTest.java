@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -111,6 +112,17 @@ class CheckApiIntegrationTest {
     }
 
     @Test
+    void supportsUnicodeFilenameBoundaryThroughRealHttp() throws Exception {
+        String accepted = "😀".repeat(251) + ".pdf";
+        HttpResponse<String> response = send("daily", List.of(new Upload(accepted, 1)));
+        assertThat(response.statusCode()).isEqualTo(201);
+        assertThat(json.readTree(response.body()).path("documents").get(0).path("name").asText())
+                .isEqualTo(accepted);
+        assertThat(send("daily", List.of(new Upload("😀" + accepted, 1))).statusCode()).isEqualTo(422);
+        assertThat(count("checks")).isEqualTo(1);
+    }
+
+    @Test
     void invalidFieldsDoNotWriteToDatabase() throws Exception {
         assertThat(send("monthly", List.of(new Upload("scan.jpg", 1))).statusCode()).isEqualTo(422);
         assertEmptyDatabase();
@@ -144,13 +156,19 @@ class CheckApiIntegrationTest {
 
     @Test
     void rollsBackServiceTransactionAfterActualDatabaseInserts() throws Exception {
+        AtomicBoolean inserted = new AtomicBoolean();
         doAnswer(invocation -> {
-            invocation.callRealMethod();
+            entityManager.persist(invocation.getArgument(0));
             entityManager.flush();
+            assertThat(count("checks")).isEqualTo(1);
+            assertThat(count("check_documents")).isEqualTo(1);
+            assertThat(count("check_issues")).isEqualTo(4);
+            inserted.set(true);
             throw new IllegalStateException("forced failure after flush");
         }).when(repository).save(any());
         HttpResponse<String> response = send("daily", List.of(new Upload("scan.jpg", 1)));
         assertThat(response.statusCode()).isEqualTo(500);
+        assertThat(inserted).isTrue();
         assertThat(response.body()).doesNotContain("forced failure");
         assertEmptyDatabase();
     }

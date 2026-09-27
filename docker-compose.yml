@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-dta}
       POSTGRES_USER: ${POSTGRES_USER:-dta}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dta-local-demo}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -15,15 +15,16 @@ services:
 
   app:
     build: .
+    pull_policy: build
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/dta}
-      DB_USERNAME: ${DB_USERNAME:-dta}
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-dta}
+      DB_USERNAME: ${POSTGRES_USER:-dta}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-dta-local-demo}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
 
 volumes:
   postgres-data:

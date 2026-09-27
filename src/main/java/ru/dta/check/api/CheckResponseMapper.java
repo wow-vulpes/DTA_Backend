@@ -11,6 +11,7 @@ import ru.dta.check.persistence.CheckEntity;
 import ru.dta.check.persistence.CheckDocumentEntity;
 import ru.dta.check.persistence.CheckIssueEntity;
 import ru.dta.check.application.CheckListPage;
+import ru.dta.check.application.CheckSummary;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public abstract class CheckResponseMapper {
@@ -29,10 +30,7 @@ public abstract class CheckResponseMapper {
                 page.page(), page.size(), page.total());
     }
 
-    public CheckSummaryResponse toSummary(CheckEntity check) {
-        return new CheckSummaryResponse(check.getId(), check.getCheckedAt(),
-                toLowercase(check.getRecordType()), toLowercase(check.getStatus()), check.getDocuments().size());
-    }
+    public abstract CheckSummaryResponse toSummary(CheckSummary check);
 
     protected String toLowercase(Enum<?> value) {
         return value == null ? null : value.name().toLowerCase(Locale.ROOT);

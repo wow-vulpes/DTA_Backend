@@ -1,4 +1,4 @@
-package ru.dta.check.api;
+package ru.dta.check.application;
 
 import java.util.UUID;
 

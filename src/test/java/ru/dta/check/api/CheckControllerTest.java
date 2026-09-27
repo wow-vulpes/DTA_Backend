@@ -22,6 +22,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import ru.dta.check.application.CheckService;
+import ru.dta.check.application.CheckNotFoundException;
+import ru.dta.check.application.CheckListPage;
 import ru.dta.check.domain.MaterialMetadata;
 import ru.dta.check.domain.MaterialTypeDetector;
 import ru.dta.check.domain.RecordChecker;
@@ -153,7 +155,7 @@ class CheckControllerTest {
 
     @Test
     void listsChecksWithQueryParameters() throws Exception {
-        when(service.findChecks(any())).thenReturn(new ru.dta.check.application.CheckListPage(List.of(), 1, 10, 0));
+        when(service.findChecks(any())).thenReturn(new CheckListPage(List.of(), 1, 10, 0));
         mvc.perform(get("/api/checks").param("record_type", "daily").param("status", "complete")
                         .param("page", "1").param("size", "10"))
                 .andExpect(status().isOk())
@@ -169,6 +171,22 @@ class CheckControllerTest {
         mvc.perform(get("/api/checks").param("page", "-1"))
                 .andExpect(status().is(422))
                 .andExpect(jsonPath("$.code").value("validation_error"));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void rejectsMalformedUuidWithoutCallingService() throws Exception {
+        mvc.perform(get("/api/checks/not-a-uuid"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("invalid_parameter"));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void rejectsUnknownStatusWithoutCallingService() throws Exception {
+        mvc.perform(get("/api/checks").param("status", "unknown"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.field_errors[0].field").value("status"));
         verifyNoInteractions(service);
     }
 
@@ -208,6 +226,7 @@ class CheckControllerTest {
     static Stream<Failure> failures() {
         return Stream.of(new Failure(new DataAccessResourceFailureException("secret"), 503, "database_unavailable"),
                 new Failure(new IllegalStateException("secret"), 500, "internal_error"),
+                new Failure(new IllegalArgumentException("secret"), 500, "internal_error"),
                 new Failure(new MultipartException("secret"), 400, "invalid_multipart"),
                 new Failure(new MaxUploadSizeExceededException(1), 413, "payload_too_large"));
     }

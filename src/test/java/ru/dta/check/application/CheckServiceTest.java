@@ -5,8 +5,11 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import java.util.Optional;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -21,7 +24,6 @@ import ru.dta.check.persistence.CheckRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -71,11 +73,18 @@ class CheckServiceTest {
         CheckEntity entity = CheckEntity.fromResult(RecordType.DAILY,
                 new RecordChecker(new MaterialTypeDetector()).check(RecordType.DAILY, List.of()), now,
                 "Комплект неполный", "Нет материалов.");
-        when(repository.findAll(nullable(Specification.class), any(Pageable.class)))
+        UUID id = UUID.randomUUID();
+        ReflectionTestUtils.setField(entity, "id", id);
+        when(repository.findAll(ArgumentMatchers.<Specification<CheckEntity>>any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(entity), Pageable.ofSize(20).withPage(1), 21));
-        CheckListPage page = service.findChecks(new ru.dta.check.api.CheckQuery(
-                "daily", "incomplete", null, null, 1, 20));
-        assertThat(page.items()).containsExactly(entity);
+        CheckRepository.DocumentCount count = mock(CheckRepository.DocumentCount.class);
+        when(count.getCheckId()).thenReturn(id);
+        when(count.getTotal()).thenReturn(3L);
+        when(repository.countDocuments(List.of(id))).thenReturn(List.of(count));
+        CheckListPage page = service.findChecks(new CheckQuery(
+                RecordType.DAILY, CheckStatus.INCOMPLETE, null, null, 1, 20));
+        assertThat(page.items()).containsExactly(new CheckSummary(id, now, RecordType.DAILY,
+                CheckStatus.INCOMPLETE, 3));
         assertThat(page.page()).isEqualTo(1);
         assertThat(page.size()).isEqualTo(20);
         assertThat(page.total()).isEqualTo(21);
@@ -84,8 +93,8 @@ class CheckServiceTest {
     @Test
     void missingDetailIsReported() {
         UUID id = UUID.randomUUID();
-        when(repository.findById(id)).thenReturn(java.util.Optional.empty());
+        when(repository.findById(id)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.getCheck(id))
-                .isInstanceOf(ru.dta.check.api.CheckNotFoundException.class);
+                .isInstanceOf(CheckNotFoundException.class);
     }
 }

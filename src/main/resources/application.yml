@@ -15,5 +15,7 @@ spring:
       max-request-size: 120MB
 server:
   tomcat:
+    # До 255 Unicode-символов в имени (до 1020 байт UTF-8) плюс заголовки части.
+    max-part-header-size: 2KB
     # Дочитать отклонённую загрузку около лимита, чтобы клиент получил ответ 413.
     max-swallow-size: 128MB

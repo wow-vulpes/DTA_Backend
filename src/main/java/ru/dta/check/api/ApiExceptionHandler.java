@@ -5,6 +5,8 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.ErrorResponse;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import ru.dta.check.application.CheckNotFoundException;
 
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpStatus;
@@ -32,9 +34,11 @@ public class ApiExceptionHandler {
         return error(HttpStatus.NOT_FOUND, "check_not_found", exception.getMessage());
     }
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiErrorResponse> invalidQuery(IllegalArgumentException exception) {
-        return error(HttpStatus.UNPROCESSABLE_CONTENT, "validation_error", exception.getMessage());
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> invalidType(MethodArgumentTypeMismatchException exception) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse("invalid_parameter",
+                "Неверный формат параметра.", List.of(new FieldErrorResponse(exception.getName(),
+                        "Проверьте формат значения."))));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

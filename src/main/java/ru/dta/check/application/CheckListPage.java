@@ -2,7 +2,8 @@ package ru.dta.check.application;
 
 import java.util.List;
 
-import ru.dta.check.persistence.CheckEntity;
-
-public record CheckListPage(List<CheckEntity> items, int page, int size, long total) {
+public record CheckListPage(List<CheckSummary> items, int page, int size, long total) {
+    public CheckListPage {
+        items = List.copyOf(items);
+    }
 }

@@ -14,10 +14,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import ru.dta.check.application.CheckService;
+import ru.dta.check.application.CheckQuery;
+import ru.dta.check.domain.CheckStatus;
 import ru.dta.check.domain.MaterialMetadata;
 import ru.dta.check.domain.RecordType;
 
@@ -70,7 +71,6 @@ public class CheckController {
     }
 
     @GetMapping(value = "/api/checks", produces = MediaType.APPLICATION_JSON_VALUE)
-    @Transactional(readOnly = true)
     public CheckListResponse findChecks(@RequestParam(name = "record_type", required = false) String recordType,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "from", required = false) Instant from,
@@ -82,11 +82,11 @@ public class CheckController {
                     new FieldErrorResponse("query", "Проверьте page, size, from и to.")));
         }
         return responseMapper.toListResponse(checkService.findChecks(
-                new CheckQuery(recordType, status, from, to, page, size)));
+                new CheckQuery(parseFilter(recordType, RecordType.class, "record_type"),
+                        parseFilter(status, CheckStatus.class, "status"), from, to, page, size)));
     }
 
     @GetMapping(value = "/api/checks/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    @Transactional(readOnly = true)
     public CheckResponse getCheck(@PathVariable("id") UUID id) {
         return responseMapper.toResponse(checkService.getCheck(id));
     }
@@ -95,5 +95,17 @@ public class CheckController {
         return name != null && !name.isBlank() && name.codePointCount(0, name.length()) <= 255
                 && name.indexOf('/') < 0 && name.indexOf('\\') < 0
                 && name.codePoints().noneMatch(Character::isISOControl);
+    }
+
+    private <E extends Enum<E>> E parseFilter(String value, Class<E> type, String field) {
+        if (value == null) {
+            return null;
+        }
+        for (E constant : type.getEnumConstants()) {
+            if (constant.name().equalsIgnoreCase(value)) {
+                return constant;
+            }
+        }
+        throw new InvalidCheckRequestException(List.of(new FieldErrorResponse(field, "Недопустимое значение.")));
     }
 }
