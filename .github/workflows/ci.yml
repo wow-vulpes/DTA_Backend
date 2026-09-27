@@ -39,7 +39,10 @@ jobs:
           import json
           with open('/tmp/check.json') as source, open('/tmp/restored.json') as restored:
               original, actual = json.load(source), json.load(restored)
-          assert original == actual, 'Result changed after restart'
+          differences = {key: {'before': original.get(key), 'after': actual.get(key)}
+                         for key in original.keys() | actual.keys()
+                         if original.get(key) != actual.get(key)}
+          assert original == actual, f'Result changed after restart: {differences}'
           assert actual['status'] == 'incomplete'
           assert len(actual['documents']) == 1
           PY

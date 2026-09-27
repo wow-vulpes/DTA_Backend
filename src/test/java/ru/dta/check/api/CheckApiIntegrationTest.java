@@ -6,6 +6,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +33,7 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -52,6 +55,9 @@ class CheckApiIntegrationTest {
     @MockitoSpyBean
     private CheckRepository repository;
 
+    @MockitoSpyBean
+    private Clock clock;
+
     @BeforeEach
     void clearData() {
         jdbc.update("DELETE FROM checks");
@@ -60,6 +66,7 @@ class CheckApiIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"daily", "weekly"})
     void createsCompleteResultAndPersistsAllMetadata(String type) throws Exception {
+        doReturn(Instant.parse("2026-09-26T12:00:00.123456789Z")).when(clock).instant();
         List<Upload> files = new ArrayList<>(List.of(new Upload("observation diary.pdf", 1024),
                 new Upload("session report.docx", 1), new Upload("parent feedback.png", 1)));
         if (type.equals("weekly")) {
@@ -76,6 +83,13 @@ class CheckApiIntegrationTest {
         assertThat(body.path("documents").get(0).path("detected_type").asText()).isEqualTo("observation_diary");
         assertThat(body.path("documents").get(0).path("size_kb").decimalValue()).isEqualByComparingTo("1.00");
         assertThat(body.path("checked_at").asText()).endsWith("Z");
+        HttpRequest getRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/checks/" + id))
+                .timeout(Duration.ofSeconds(10)).GET().build();
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            HttpResponse<String> detail = client.send(getRequest, HttpResponse.BodyHandlers.ofString());
+            assertThat(detail.statusCode()).isEqualTo(200);
+            assertThat(json.readTree(detail.body())).isEqualTo(body);
+        }
         assertThat(jdbc.queryForObject("SELECT status FROM checks WHERE id = ?", String.class, id))
                 .isEqualTo("COMPLETE");
         assertThat(jdbc.queryForList("SELECT name FROM check_documents WHERE check_id = ? ORDER BY position",

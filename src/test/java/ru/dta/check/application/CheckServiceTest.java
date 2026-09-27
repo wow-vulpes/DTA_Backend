@@ -51,6 +51,16 @@ class CheckServiceTest {
     }
 
     @Test
+    void normalizesTimestampToDatabasePrecisionBeforeSaving() {
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        CheckService preciseService = new CheckService(new RecordChecker(new MaterialTypeDetector()),
+                repository, Clock.fixed(Instant.parse("2026-09-26T12:00:00.123456789Z"), ZoneOffset.UTC));
+        CheckEntity result = preciseService.createCheck(RecordType.DAILY, List.of());
+        assertThat(result.getCheckedAt()).isEqualTo(Instant.parse("2026-09-26T12:00:00.123456Z"));
+        verify(repository).save(result);
+    }
+
+    @Test
     void savesIncompleteResultAsNormalOutcome() {
         when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         CheckEntity result = service.createCheck(RecordType.WEEKLY,

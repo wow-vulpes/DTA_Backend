@@ -1,6 +1,7 @@
 package ru.dta.check.application;
 
 import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.Map;
@@ -40,7 +41,9 @@ public class CheckService {
         if (complete && !result.issues().isEmpty()) {
             reason = "Все обязательные материалы присутствуют; есть предупреждения.";
         }
-        return checkRepository.save(CheckEntity.fromResult(recordType, result, clock.instant(), label, reason));
+        // PostgreSQL хранит timestamp с точностью до микросекунд: POST и GET должны совпадать.
+        return checkRepository.save(CheckEntity.fromResult(recordType, result,
+                clock.instant().truncatedTo(ChronoUnit.MICROS), label, reason));
     }
 
     @Transactional(readOnly = true)
